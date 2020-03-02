@@ -1,0 +1,144 @@
+package thread;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.logging.Logger;
+
+import org.wiegand.TestZone.TestShort;
+
+import com.DoorAddressServer;
+import com.baidu.speech.restapi.ttsdemo.BaiDuSpeak;
+
+
+
+
+public class ISRestartDoorAccessUDPServer extends Thread{
+	private static Logger log = Logger.getLogger("ISRestartDoorAccessUDPServer");
+	private static boolean run = true;
+	private static ServerSocket serverSocket = null;
+
+	
+	private static int port = 40001;
+	
+	private static DoorAddressServer page = null;
+	
+	private static final String DOORADDRESSSUCCESS = "doorAddressSuccess.mp3";
+	
+	private static final String DOORADDRESSFAIL = "doorAddressFail.mp3";
+	
+	private static BaiDuSpeak baiduSpeak = new BaiDuSpeak();
+	
+	public static boolean isRun() {
+		return run;
+	}
+	public ISRestartDoorAccessUDPServer() throws SocketException {
+		try {
+			serverSocket = new ServerSocket(port);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			log.info("【ISRestartDoorAccessUDPServer服务地址已经绑定======】");
+			e1.printStackTrace();
+		}
+	}
+	
+	public static void main(String[] args) {
+		ISRestartDoorAccessUDPServer server;
+		try {
+			page = new DoorAddressServer();
+			server = new ISRestartDoorAccessUDPServer();
+			server.start();
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public synchronized void run() {
+		if (run) {
+			// VistorRuntimeStatus.put(VistorRuntimeStatus.READ_CARD_RUNNING,new
+			// Boolean(true));
+			while (isRun()) {
+				try {
+					if(serverSocket==null) {
+						log.info("【ISRestartDoorAccessUDPServer为空服务程序退出======】");
+						break;
+					}
+					// 2.接收连接 accept 方法, 返回 socket 对象.
+					Socket server = serverSocket.accept();
+					// 3.通过socket 获取输入流
+					InputStream is = server.getInputStream();
+					// 4.一次性读取数据
+					// 4.1 创建字节数组
+					byte[] b = new byte[1024];
+					// 4.2 据读取到字节数组中.
+					int len = is.read(b);
+					// 4.3 解析数组,打印字符串信息
+					String message = new String(b, 0, len);
+					if("restartDoorAccess".equals(message)) {
+						TestShort.init();
+						int i = TestShort.changeIp();
+						if(i==0) {
+							try{								
+								baiduSpeak.speak("门禁地址配置失败");
+							}catch(Exception e){
+								e.printStackTrace();
+								log.info("百度语音播报异常");
+								baiduSpeak.playBase(DOORADDRESSFAIL);
+							}
+						}
+						if(i==1) {
+							try{									
+								baiduSpeak.speak("门禁地址配置成功");
+							}catch(Exception e) {
+									e.printStackTrace();
+									log.info("百度语音播报异常");
+									baiduSpeak.playBase(DOORADDRESSSUCCESS);
+							}
+						}
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+
+				try {
+					Thread.sleep(300);
+				} catch (InterruptedException e) {
+				}
+			
+			}
+		}
+
+	}
+
+	
+	
+	public static void setRun(boolean isrun) {
+		run = isrun;
+	
+		try {
+			Thread.sleep(500);
+		} catch (InterruptedException e) {
+		}
+	}
+	
+	public String byteToStr(byte[] buffer) {
+		try {
+			int length = 0;
+			for (int i = 0; i < buffer.length; ++i) {
+				if (buffer[i] == 0) {
+					length = i;
+					break;
+				}
+			}
+			return new String(buffer, 0, length, "UTF-8");
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
+}
